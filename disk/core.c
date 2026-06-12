@@ -13,18 +13,23 @@ static int disk_image__close(struct disk_image *disk);
 
 int disk_img_name_parser(const struct option *opt, const char *arg, int unset)
 {
-	const char *cur;
+	char *filename;
+	char *cur;
 	char *sep;
 	struct kvm *kvm = opt->ptr;
 
 	if (kvm->nr_disks >= MAX_DISK_IMAGES)
 		die("Currently only 4 images are supported");
 
-	kvm->cfg.disk_image[kvm->nr_disks].filename = arg;
-	cur = arg;
+	filename = strdup(arg);
+	if (!filename)
+		return -ENOMEM;
 
-	if (strncmp(arg, "scsi:", 5) == 0) {
-		sep = strstr(arg, ":");
+	kvm->cfg.disk_image[kvm->nr_disks].filename = filename;
+	cur = filename;
+
+	if (strncmp(filename, "scsi:", 5) == 0) {
+		sep = strstr(filename, ":");
 		kvm->cfg.disk_image[kvm->nr_disks].wwpn = sep + 1;
 
 		/* Old invocation had two parameters. Ignore the second one. */

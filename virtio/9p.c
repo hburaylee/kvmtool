@@ -1491,25 +1491,35 @@ struct virtio_ops p9_dev_virtio_ops = {
 
 int virtio_9p_rootdir_parser(const struct option *opt, const char *arg, int unset)
 {
+	char *rootdir;
 	char *tag_name;
 	char tmp[PATH_MAX];
 	struct kvm *kvm = opt->ptr;
+	int ret;
 
 	/*
 	 * 9p dir can be of the form dirname,tag_name or
 	 * just dirname. In the later case we use the
 	 * default tag name
 	 */
-	tag_name = strstr(arg, ",");
+	rootdir = strdup(arg);
+	if (!rootdir)
+		return -ENOMEM;
+
+	tag_name = strstr(rootdir, ",");
 	if (tag_name) {
 		*tag_name = '\0';
 		tag_name++;
 	}
-	if (realpath(arg, tmp)) {
-		if (virtio_9p__register(kvm, tmp, tag_name) < 0)
+	if (realpath(rootdir, tmp)) {
+		ret = virtio_9p__register(kvm, tmp, tag_name);
+		free(rootdir);
+		if (ret < 0)
 			die("Unable to initialize virtio 9p");
-	} else
+	} else {
+		free(rootdir);
 		die("Failed resolving 9p path");
+	}
 	return 0;
 }
 
