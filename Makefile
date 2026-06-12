@@ -428,6 +428,9 @@ all: $(PROGRAM) $(PROGRAM_ALIAS)
 # This is intentionally not assigned using :=
 c_flags	= -Wp,-MD,$(depfile) -Wp,-MT,$@ $(CFLAGS)
 
+# The .cmd file for the current target (records the full compile command)
+cmdfile = $(dir $@).$(notdir $@).cmd
+
 # When building -static all objects are built with appropriate flags, which
 # may differ between static & dynamic .o.  The objects are separated into
 # .o and .static.o.  See the %.o: %.c rules below.
@@ -438,6 +441,9 @@ STATIC_OBJS = $(patsubst %.o,%.static.o,$(OBJS) $(OBJS_STATOPT))
 
 STATIC_DEPS	:= $(foreach obj,$(STATIC_OBJS),\
 		$(subst $(comma),_,$(dir $(obj)).$(notdir $(obj)).d))
+
+CMDFILES := $(foreach obj,$(OBJS) $(OBJS_DYNOPT) $(OTHEROBJS) $(GUEST_OBJS), $(dir $(obj)).$(notdir $(obj)).cmd)
+STATIC_CMDFILES := $(foreach obj,$(STATIC_OBJS), $(dir $(obj)).$(notdir $(obj)).cmd)
 
 $(PROGRAM)-static:  $(STATIC_OBJS) $(OTHEROBJS) $(GUEST_OBJS) $(LIBFDT_STATIC)
 	$(E) "  LINK    " $@
@@ -481,6 +487,7 @@ ifeq ($(C),1)
 endif
 	$(E) "  CC      " $@
 	$(Q) $(CC) -c $(c_flags) $< -o $@
+	$(Q) echo 'cmd_$@ := $(CC) -c $(c_flags) $< -o $@' > $(cmdfile)
 
 %.static.o: %.c
 ifeq ($(C),1)
@@ -489,6 +496,7 @@ ifeq ($(C),1)
 endif
 	$(E) "  CC      " $@
 	$(Q) $(CC) -c $(c_flags) $(CFLAGS_STATOPT)  $< -o $@
+	$(Q) echo 'cmd_$@ := $(CC) -c $(c_flags) $(CFLAGS_STATOPT) $< -o $@' > $(cmdfile)
 
 %.o: %.c
 ifeq ($(C),1)
@@ -497,6 +505,7 @@ ifeq ($(C),1)
 endif
 	$(E) "  CC      " $@
 	$(Q) $(CC) -c $(c_flags) $(CFLAGS_DYNOPT) $< -o $@
+	$(Q) echo 'cmd_$@ := $(CC) -c $(c_flags) $(CFLAGS_DYNOPT) $< -o $@' > $(cmdfile)
 
 
 #
@@ -545,8 +554,8 @@ check: all
 
 install: all
 	$(E) "  INSTALL"
-	$(Q) $(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(bindir_SQ)' 
-	$(Q) $(INSTALL) $(PROGRAM) '$(DESTDIR_SQ)$(bindir_SQ)' 
+	$(Q) $(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(bindir_SQ)'
+	$(Q) $(INSTALL) $(PROGRAM) '$(DESTDIR_SQ)$(bindir_SQ)'
 .PHONY: install
 
 clean:
@@ -563,6 +572,8 @@ clean:
 	$(Q) rm -f tags
 	$(Q) rm -f TAGS
 	$(Q) rm -f KVMTOOLS-VERSION-FILE
+	$(Q) rm -f $(CMDFILES) $(STATIC_CMDFILES)
+	$(Q) rm -f compile_commands.json
 .PHONY: clean
 
 KVM_DEV	?= /dev/kvm
@@ -591,6 +602,11 @@ cscope:
 	$(Q) $(FIND) . -name '*.[hcS]' -print > cscope.files
 	$(Q) $(CSCOPE) -bkqu
 .PHONY: cscope
+
+compile_commands:
+	$(E) "  GEN" $@
+	$(Q) python3 scripts/gen_compile_commands.py
+.PHONY: compile_commands
 
 #
 # Escape redundant work on cleaning up

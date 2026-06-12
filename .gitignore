@@ -4,7 +4,10 @@
 *.o
 *.d
 *.swp
+*.o.cmd
 /cscope.*
+.cache
+compile_commands.json
 tags
 tests/boot/boot_test.iso
 tests/boot/rootfs/
